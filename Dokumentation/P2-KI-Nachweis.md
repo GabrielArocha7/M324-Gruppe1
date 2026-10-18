@@ -66,3 +66,10 @@ Die endgültige Entscheidung, welche Vorschläge verwendet werden, habe ich selb
 Für Schritt 4 habe ich KI für Vorschläge zum Integrationstest und zur GitHub-Actions-Datei verwendet. Ich habe die Lösung angepasst, damit der Test ohne MongoDB und ohne Passwörter läuft.
 
 Geprüft habe ich die Lösung mit beiden Maven-Testbefehlen. Dabei liefen die Unit-Tests und die zwei Integrationstests erfolgreich durch. Die CI-Datei führt dieselben Tests bei Pull Requests aus.
+
+## Start Skript
+Für den Start des Systems habe ich ein Skript erstellt, das die notwendigen Umgebungsvariablen setzt und die beiden Microservices startet.
+
+## Demo-Ablauf
+
+Für den letzten Schritt habe ich eine Demo des gesamten Systems vorbereitet. Dabei werden die wichtigsten Funktionen des Flughafen- und Flugservices vorgestellt. Die Demo zeigt, wie ein neuer Flughafen angelegt, ein Flug gebucht und die entsprechenden Daten abgerufen werden können. Ich werde auch auf die Fehlerbehandlung eingehen und demonstrieren, wie das System auf ungültige Eingaben reagiert. Ablauf wurde festgelegt und die KI entwarf daraus `P2-Demo-Ablauf.md`.
