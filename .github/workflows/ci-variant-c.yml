@@ -1,11 +1,6 @@
 name: CI Variante C (Matrix)
 
 on:
-  push:
-    branches: [ "feature/P3-**" ]
-    paths:
-      - "Code/P2/**"
-      - ".github/workflows/ci-variant-c.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,11 +1,6 @@
 name: CI Variante B (Stages)
 
 on:
-  push:
-    branches: [ "feature/P3-**" ]
-    paths:
-      - "Code/P2/**"
-      - ".github/workflows/ci-variant-b.yml"
   workflow_dispatch:
 
 permissions:

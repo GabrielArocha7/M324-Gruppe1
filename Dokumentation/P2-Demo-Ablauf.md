@@ -178,16 +178,16 @@ Der Test benötigt keine echte Datenbank und keine Passwörter.
 Auf GitHub öffnen wir:
 
 ```text
-Actions → P2 CI → letzter Lauf
+Actions → CI → letzter Lauf
 ```
 
 Zusätzlich zeigen wir die Datei:
 
 ```text
-.github/workflows/p2-ci.yml
+.github/workflows/ci.yml
 ```
 
-Die Pipeline führt die Tests beider Maven-Projekte bei Pushes und Pull Requests aus.
+Die Pipeline führt die Tests beider Maven-Projekte bei Pushes und Pull Requests aus. Details zur CI stehen in `P3-CI.md`.
 
 ## 9. Git-Prozess und Code Review
 

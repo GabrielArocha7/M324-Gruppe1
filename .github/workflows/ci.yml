@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "feature/**" ]
+    branches: [ main, "feature/**" ]
     paths:
       - "Code/P2/**"
       - ".github/workflows/ci.yml"

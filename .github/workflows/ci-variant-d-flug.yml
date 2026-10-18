@@ -1,12 +1,6 @@
 name: CI Variante D (flug-service)
 
 on:
-  push:
-    branches: [ "feature/P3-**" ]
-    paths:
-      - "Code/P2/flug-service/**"
-      - ".github/workflows/ci-variant-d-flug.yml"
-      - ".github/workflows/_maven-service.yml"
   workflow_dispatch:
 
 permissions:

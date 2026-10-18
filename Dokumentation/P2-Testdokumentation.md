@@ -24,7 +24,7 @@ Der Test verwendet keine echte Datenbank und keine echten Zugangsdaten. Er kann 
 
 ## CI
 
-Die Datei `.github/workflows/p2-ci.yml` führt die Tests beider Services bei Pushes und Pull Requests gegen `main` aus. Die Testresultate sind danach im GitHub-Actions-Lauf sichtbar.
+Die Datei `.github/workflows/ci.yml` führt die Tests beider Services bei Pushes und Pull Requests gegen `main` aus (bis P3: `p2-ci.yml`, siehe `P3-CI.md`). Die Testresultate sind danach im GitHub-Actions-Lauf sichtbar.
 
 ## Letztes lokales Testresultat
 

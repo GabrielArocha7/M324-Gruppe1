@@ -1,11 +1,6 @@
 name: CI Variante A (Monolith)
 
 on:
-  push:
-    branches: [ "feature/P3-**" ]
-    paths:
-      - "Code/P2/**"
-      - ".github/workflows/ci-variant-a.yml"
   workflow_dispatch:
 
 permissions:

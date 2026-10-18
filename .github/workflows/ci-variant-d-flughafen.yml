@@ -1,12 +1,6 @@
 name: CI Variante D (flughafen-service)
 
 on:
-  push:
-    branches: [ "feature/P3-**" ]
-    paths:
-      - "Code/P2/flughafen-service/**"
-      - ".github/workflows/ci-variant-d-flughafen.yml"
-      - ".github/workflows/_maven-service.yml"
   workflow_dispatch:
 
 permissions:
