@@ -13,6 +13,7 @@
 
 ## Dokumentation
 - P3: [Continuous Integration](./Dokumentation/P3-CI.md)
+- P3b: [Artefakt-Repository](./Dokumentation/P3b-Artefakt-Repository.md)
 
 Gehen Sie vor wie in diesem Dokument beschrieben.
 
