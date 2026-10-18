@@ -84,8 +84,7 @@ M324-Gruppe1/
 Inhalt der `.env`:
 
 ```env
-MONGODB_AIRPORT_URI='mongodb+srv://flughafen_db:PASSWORT@cluster0.xxxxx.mongodb.net/flughafen_db?retryWrites=true&w=majority&appName=Cluster0'
-MONGODB_FLIGHT_URI='mongodb+srv://flug_db:PASSWORT@cluster0.xxxxx.mongodb.net/flug_db?retryWrites=true&w=majority&appName=Cluster0'
+  
 AIRPORT_SERVICE_URL='http://localhost:8081'
 ```
 

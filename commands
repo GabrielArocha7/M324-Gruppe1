@@ -1,0 +1,3 @@
+mvn -f Code/P2/flughafen-service/pom.xml test
+
+mvn -f Code/P2/flug-service/pom.xml test

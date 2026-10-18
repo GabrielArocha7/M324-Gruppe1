@@ -23,6 +23,7 @@ class FlightControllerTest {
     @MockBean
     private FlightService service;
 
+    /** Prüft, dass ein gültiger Flug mit HTTP 201 erstellt wird. */
     @Test
     void createsFlightForValidRequest() throws Exception {
         when(service.create(any())).thenReturn(flight());
@@ -33,6 +34,7 @@ class FlightControllerTest {
                 .andExpect(status().isCreated());
     }
 
+    /** Prüft, dass ein fehlender Flugzeugtyp mit HTTP 400 abgelehnt wird. */
     @Test
     void rejectsMissingAircraftType() throws Exception {
         mockMvc.perform(post("/api/flights")
@@ -41,6 +43,7 @@ class FlightControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /** Prüft, dass gleiche Start- und Zielflughäfen mit HTTP 400 abgelehnt werden. */
     @Test
     void rejectsSameAirports() throws Exception {
         when(service.create(any())).thenThrow(new SameAirportException());
@@ -51,6 +54,7 @@ class FlightControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /** Prüft, dass ein unbekannter Flughafen mit HTTP 404 abgelehnt wird. */
     @Test
     void rejectsUnknownAirport() throws Exception {
         when(service.create(any())).thenThrow(new UnknownAirportException("JFK"));

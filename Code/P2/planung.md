@@ -38,7 +38,7 @@
 
 **Kontrolle:** Gültige Flüge werden gespeichert und ungültige Eingaben korrekt abgelehnt; alle Unit Tests sind erfolgreich.
 
-## Schritt 4: Integration und Abschluss 
+## Schritt 4: Integration und Abschluss — umgesetzt
 
 1. Kommunikation zwischen beiden Services testen.
 2. Integrationstests erstellen.
@@ -48,4 +48,6 @@
 6. KI-Nutzung dokumentieren.
 7. Gesamte Abgabe kontrollieren.
 
-**Kontrolle:** Alle Tests laufen lokal und in der CI-Pipeline erfolgreich durch.
+**Kontrolle:** Alle Tests laufen lokal erfolgreich. Die CI-Pipeline ist eingerichtet und wird nach dem Push in GitHub ausgeführt.
+
+**Ergebnis:** Beide Unit-Test-Suites und der Integrationstest laufen lokal erfolgreich. Die GitHub-Actions-Datei führt dieselben Tests bei Pushes und Pull Requests aus.
