@@ -1,158 +1,148 @@
 # P3 – Continuous Integration
 
-## 1. Technologie: GitHub Actions
+## 1. GitHub Actions
 
 Unser Code liegt auf GitHub, deshalb verwenden wir GitHub Actions.
 
-| Begriff | Bedeutung | Bei uns |
-|---|---|---|
-| Workflow | YAML-Datei in `.github/workflows/`, wird durch ein Event ausgelöst | `ci.yml`, `ci-variant-*.yml` |
-| Event / Trigger | Auslöser, z. B. `push`, `pull_request`, `workflow_dispatch` | siehe Kapitel 2 |
-| Job | Läuft auf einem eigenen, frischen Runner. Jobs laufen parallel, ausser sie sind mit `needs` verkettet | `build`, `unit-test`, `integration-test`, `system-test` |
-| Step | Einzelner Befehl (`run`) oder eine fertige Action (`uses`) innerhalb eines Jobs | `mvn verify`, `actions/checkout` |
-| Runner | VM von GitHub, auf der ein Job läuft | `ubuntu-24.04` |
-| Matrix | Startet denselben Job mehrfach mit unterschiedlichen Werten | `service: [flughafen-service, flug-service]` |
-| Artefakt | Datei, die ein Job hochlädt, damit andere Jobs oder Personen sie nutzen können | JARs, Testreports |
-| Cache | Wiederverwendung von Dateien zwischen Runs | `~/.m2` (Maven-Abhängigkeiten) |
-| Reusable Workflow | Workflow mit `workflow_call`, der von anderen Workflows aufgerufen wird | `_system-test.yml`, `_maven-service.yml` |
+- **Workflow:** YAML-Datei in `.github/workflows/`. Er startet bei einem Event, z. B. `push`, `pull_request` oder manuell (`workflow_dispatch`).
+- **Job:** läuft auf einem eigenen, frischen Runner (VM von GitHub). Jobs laufen parallel, ausser sie sind mit `needs` verkettet.
+- **Step:** ein Befehl (`run`) oder eine fertige Action (`uses`) innerhalb eines Jobs.
+- **Matrix:** startet denselben Job mehrmals mit anderen Werten, bei uns einmal pro Service.
+- **Artefakt:** Datei, die ein Job hochlädt (z. B. JAR oder Testreport).
+- **Cache:** Maven-Abhängigkeiten werden zwischen Runs wiederverwendet.
 
-Da jeder Job auf einem eigenen Runner startet, muss jeder Job den Code neu auschecken und Java einrichten. Ergebnisse (z. B. das JAR) werden über Artefakte weitergegeben.
+Weil jeder Job auf einem neuen Runner startet, muss jeder Job den Code neu auschecken und Java einrichten. Das JAR wird zwischen den Jobs als Artefakt weitergegeben.
 
 ## 2. Branching-Strategie und Trigger
 
-Die Branching-Strategie aus P2 ([P2-Prozess.md](P2-Prozess.md)) bleibt: kurzlebige `feature/*`-Branches, Pull Request auf `main`, Review, Squash-Merge. Die CI ist daran so gekoppelt:
+Wir behalten die Strategie aus P2 ([P2-Prozess.md](P2-Prozess.md)): kurzlebige `feature/*`-Branches, Pull Request auf `main`, Review, Squash-Merge.
 
 | Event | Branch | Workflow | Zweck |
 |---|---|---|---|
-| `push` | `feature/**` (nur bei Änderungen in `Code/P2/**`) | `ci.yml` | Schnelles Feedback während der Entwicklung |
-| `pull_request` | Ziel `main` | `ci.yml` (ohne paths-Filter) | Qualitäts-Gate vor dem Merge |
-| `workflow_dispatch` | beliebig | alle | Manueller Start, z. B. durch die Lehrperson |
-| `push` | `feature/P3-**` | `ci-variant-*.yml` | Nur zum Vergleichen der Varianten |
+| `push` | `feature/**` | `ci.yml` | Feedback während der Entwicklung |
+| `pull_request` | Ziel `main` | `ci.yml` | Prüfung vor dem Merge |
+| `push` | `main` | `ci.yml` | Stand nach dem Merge prüfen (in P3b auch Publish) |
+| manuell | beliebig | alle Workflows | z. B. durch die Lehrperson |
 
-Regeln für `main` (Branch Protection):
+Beim `push` läuft `ci.yml` nur, wenn sich etwas unter `Code/P2/` oder an der Pipeline ändert. Reine Doku-Änderungen lösen keinen Lauf aus. Beim Pull Request gibt es diesen Filter nicht, weil der Check für den Merge verlangt wird und sonst nie starten würde.
 
-- Merge nur über Pull Request mit mindestens einem Review.
-- Required Status Checks: alle Jobs von `CI` müssen grün sein.
-- Keine direkten Pushes auf `main`.
+Die Vergleichsvarianten (`ci-variant-*.yml`) starten nur manuell, damit nicht bei jedem Push sechs Workflows laufen.
 
-✏️ Screenshot der Branch-Protection-Regel einfügen.
+Regeln für `main`:
 
-Warum kein paths-Filter beim `pull_request`? Ein „required“ Check, der wegen eines Filters nicht startet, blockiert den PR für immer. Beim `push` auf Feature-Branches spart der Filter dagegen unnötige Läufe (z. B. bei reinen Doku-Änderungen).
+- Merge nur über Pull Request mit mindestens einem Review
+- alle Jobs von `CI` müssen grün sein (Required Status Checks)
+- keine direkten Pushes
 
-Die Lehrperson muss Collaborator im Repository `ellisabeta/M324-Gruppe1` sein. Dann kann sie im Tab „Actions“ jeden Workflow über „Run workflow“ starten.
+Screenshot des Rulesets: *(folgt, sobald das Ruleset eingerichtet ist)*
+
+Damit die Lehrperson die Pipelines selbst starten kann, muss sie Collaborator im Repository `ellisabeta/M324-Gruppe1` sein. Danach kann sie unter „Actions“ jeden Workflow mit „Run workflow“ starten.
 
 ## 3. Teststufen
 
-| Stufe | Was wird getestet | Werkzeug | Dateien | Maven |
-|---|---|---|---|---|
-| Unit | Controller isoliert, Service gemockt | JUnit 5, MockMvc, Mockito | `*ControllerTest.java` | `mvn test` (Surefire) |
-| Integration | Ganzer Service (HTTP → Controller → Service → Repository) mit echter MongoDB | Spring Boot Test, Testcontainers | `*ApiIT.java` | `mvn verify -DskipUnitTests` (Failsafe) |
-| System | Beide Services + MongoDB als Container, echte HTTP-Aufrufe, auch Ausfall des Flughafenservices | docker compose, curl | `Code/P2/system-test/system-test.sh` | – |
+| Stufe | Was wird geprüft | Dateien | Wo in `ci.yml` |
+|---|---|---|---|
+| Unit | Controller einzeln, Service gemockt | `AirportControllerTest`, `FlightControllerTest` | Job `unit-test` (`mvn test`) |
+| Unit mit HTTP-Mock | Flugservice ruft den Flughafenservice auf, die Antwort wird simuliert | `FlightServiceIntegrationTest` (aus P2) | Job `unit-test` |
+| Integration | ganzer Service mit echter MongoDB im Container (Testcontainers) | `AirportApiIT`, `FlightApiIT` | Job `integration-test` (`mvn verify -DskipUnitTests`) |
+| System | beide Services und MongoDB mit docker compose, echte HTTP-Aufrufe | `Code/P2/system-test/system-test.sh` | Job `system-test` |
+
+Maven trennt die Stufen über den Namen: `*Test` läuft mit Surefire (`mvn test`), `*IT` mit Failsafe (`mvn verify`). `FlightServiceIntegrationTest` braucht keine Datenbank und läuft deshalb bei den Unit Tests mit.
 
 Integrationstests:
 
-- `AirportApiIT`: Flughafen wird gespeichert und über GET wieder geliefert; doppeltes Kürzel → `409` gegen die echte Datenbank; leere Datenbank → `404`.
-- `FlightApiIT`: gültiger Flug wird in MongoDB gespeichert; unbekannter Flughafen → `404` und nichts gespeichert; Flughafenservice nicht erreichbar → `502`. Der `AirportClient` ist hier gemockt, die Kommunikation zwischen den Services prüft der Systemtest.
+- `AirportApiIT`: Flughafen wird gespeichert und mit GET wieder geliefert, doppeltes Kürzel gibt `409`, leere Datenbank gibt `404`.
+- `FlightApiIT`: gültiger Flug wird gespeichert, unbekannter Flughafen gibt `404` (nichts gespeichert), Flughafenservice nicht erreichbar gibt `502`.
 
-Systemtest (11 Prüfungen): leere DB → 404, Flughäfen erstellen → 201, Duplikat → 409, ungültiges Kürzel → 400, GET → 200, gültiger Flug → 201, unbekannter Flughafen → 404, gleicher Flughafen → 400, Landung vor Start → 400, Flughafenservice gestoppt → 502.
-
-Lokal ausführen:
-
-```bash
-cd Code/P2/flug-service && mvn verify          # Unit + Integration (Docker nötig)
-cd Code/P2 && docker compose up -d --build && bash system-test/system-test.sh
-```
+Der Systemtest macht 11 Prüfungen: Flughäfen anlegen, Duplikat, ungültiges Kürzel, Flug anlegen, unbekannter Flughafen, gleicher Flughafen, Landung vor Start. Am Schluss wird der Flughafenservice gestoppt, dann muss der Flugservice `502` liefern.
 
 ## 4. Varianten
 
-| | A – Monolith | B – Stages als Jobs | C – Matrix | D – Workflow pro Service | Final (`ci.yml`) |
-|---|---|---|---|---|---|
-| Datei | `ci-variant-a.yml` | `ci-variant-b.yml` | `ci-variant-c.yml` | `ci-variant-d-*.yml` + `_maven-service.yml` | `ci.yml` |
-| Jobs | 1 | 4 (nacheinander) | 2 parallel + Systemtest | 1 pro Service | 2 × 3 parallel + Systemtest |
-| Services | nacheinander | nacheinander im Job | parallel | getrennte Workflows | parallel |
-| Maven-Cache | nein | ja | ja | ja | ja |
-| Systemtest | ja | ja | ja | nein | ja |
-| Laufzeit Run 1 | 150 s | 243 s | 140 s | 59 s / 65 s | 238 s |
-| Runner-Zeit Run 1 (Summe der Jobs) | 147 s | 229 s | 188 s | 55 s / 60 s | 302 s |
-| Laufzeit Run 2 ✏️ | | | | | |
-| Laufzeit Run 3 ✏️ | | | | | |
-| Link Run 1 | [Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484640) | [Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484745) | [Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484805) | [flughafen](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484818) / [flug](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346485009) | [Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484964) |
+| | Datei | Aufbau | Cache | Systemtest |
+|---|---|---|---|---|
+| P2 | `p2-ci.yml` (bis P3) | 1 Job, nur Unit Tests | ja | nein |
+| A | `ci-variant-a.yml` | 1 Job, alles nacheinander | nein | ja |
+| B | `ci-variant-b.yml` | 4 Jobs nacheinander (Build, Unit, Integration, System) | ja | ja |
+| C | `ci-variant-c.yml` | Matrix: 1 Job pro Service, danach Systemtest | ja | ja |
+| D | `ci-variant-d-*.yml` | eigener Workflow pro Service, startet nur bei Änderungen an diesem Service | ja | nein |
+| Final | `ci.yml` | 4 Stufen als Jobs, jede Stufe als Matrix pro Service | ja | ja |
 
-Bei D steht der erste Wert für den flughafen-service, der zweite für den flug-service.
+### Messwerte
 
-Messwert vor den Erweiterungen (nur flug-service, nur Unit Tests, ohne Cache): [Run 36343278338](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36343278338) – Job 36 s, davon Maven 24 s, 4 Tests grün.
+Laufzeit = Dauer des ganzen Runs. Runner-Zeit = Summe aller Jobs, also die Rechenzeit, die GitHub verbraucht.
 
-Gemessen wird die Gesamtdauer des Runs vom Start bis zum Ende. Die Runner-Zeit ist die Summe aller Jobs, also die Rechenzeit, die GitHub tatsächlich verbraucht.
+| | Laufzeit Run 1 | Laufzeit Run 2 | Runner-Zeit Run 1 | Runner-Zeit Run 2 |
+|---|---|---|---|---|
+| P2 | – | 34 s | – | 30 s |
+| A | 150 s | 154 s | 147 s | 150 s |
+| B | 243 s | 218 s | 229 s | 204 s |
+| C | 140 s | 70 s (Abbruch, siehe Kapitel 6) | 188 s | – |
+| D (Flughafen / Flug) | 59 s / 65 s | 48 s / 56 s | 55 s / 60 s | 43 s / 51 s |
+| Final | 238 s | 203 s | 302 s | 254 s |
 
-### Run 1 im Detail (Commit `cb52f30`, 27.09.2026, alle grün)
+Run 1: Commit `cb52f30` vom 27.09.2026 – [A](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484640), [B](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484745), [C](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484805), [D Flughafen](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484818), [D Flug](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346485009), [Final](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484964)
 
-| Variante | Jobs (Dauer) |
-|---|---|
-| A | Build & Test (alles in einem Job) 147 s |
-| B | Build 40 s → Unit Tests 26 s → Integrationstests 59 s → Systemtest 104 s |
-| C | Verify flughafen-service 55 s ∥ Verify flug-service 62 s → Systemtest 71 s |
-| D | flughafen-service 55 s ∥ flug-service 60 s (getrennte Workflows) |
-| Final | Build 49 s ∥ 25 s → Unit Tests 15 s ∥ 18 s → Integrationstests 50 s ∥ 37 s → Systemtest 108 s |
+Run 2: Commit `411b6fc` vom 27.09.2026 – [A](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349819914), [B](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349820045), [C](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349820046), [D Flughafen](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349820103), [D Flug](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349820067), [Final](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36349820063)
 
-(∥ = parallel, Werte in der Reihenfolge flughafen-service / flug-service)
+P2: [Run auf main](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/39150415534)
 
-Testergebnisse in Run 1 (aus dem Log von `ci.yml`):
+Testergebnis im finalen Workflow (Run 1): 5 + 4 Unit Tests, 3 + 3 Integrationstests und 11 von 11 Systemtest-Prüfungen bestanden.
 
-- Unit Tests: 5 (flughafen-service) + 4 (flug-service), alle bestanden
-- Integrationstests: 3 + 3, alle bestanden; Testcontainers startet `mongo:7.0` in 1,5–3,5 s
-- Systemtest: 11 von 11 Prüfungen OK
-- Maven-Cache: vom ersten Job gespeichert (~75 MB), von den späteren Jobs geladen („Cache restored successfully“)
-- Artefakte: `flughafen-service-cb52f30…` und `flug-service-cb52f30…` mit den JARs sowie die Testreports
+### Beobachtungen
 
-Hinweis: Alle Workflows sind in Run 1 gleichzeitig gestartet. Der Maven-Cache war zu Beginn noch leer und wurde erst während des Runs gespeichert. Run 1 ist darum teilweise ein „kalter“ Lauf; ab Run 2 ist der Cache von Anfang an vorhanden.
-
-### Beobachtungen pro Variante
-
-- **A:** Einfach zu lesen. Schlägt ein Schritt fehl, werden die folgenden nicht mehr ausgeführt. Im Log muss man suchen, welche Stufe fehlgeschlagen ist.
-- **B:** Im Actions-Tab sieht man sofort, welche Stufe rot ist. Jeder Job startet einen neuen Runner, dadurch mehr Overhead (Checkout, Java, Cache laden).
-- **C:** Beide Services laufen gleichzeitig, `fail-fast: false` zeigt Fehler von beiden Services. Die Stufen sind aber wieder in einem `mvn verify` zusammengefasst.
-- **D:** Nur der geänderte Service wird gebaut. Kein Systemtest möglich, weil kein Workflow beide Services kennt. Die Logik ist dank Reusable Workflow nicht doppelt.
+- **P2:** schnell, prüft aber nur Unit Tests. Fehler, die erst mit Datenbank oder im Zusammenspiel der Services auftreten, findet er nicht.
+- **A:** einfach zu lesen. Wenn etwas fehlschlägt, muss man im langen Log suchen, welche Stufe es war.
+- **B:** man sieht sofort, welche Stufe rot ist. Jeder Job setzt aber neu auf (Checkout, Java, Cache), dadurch ist B am langsamsten.
+- **C:** am schnellsten mit Systemtest, weil die Services parallel laufen. Unit- und Integrationstests sind aber wieder in einem `mvn verify` zusammen.
+- **D:** baut nur den geänderten Service und ist darum am schnellsten. Einen Systemtest gibt es nicht, weil kein Workflow beide Services kennt.
 
 ### Fehlerfall
 
-Einen Test absichtlich fehlschlagen lassen (z. B. erwarteten Status in `AirportControllerTest` ändern), pushen und festhalten:
+Auf dem Branch `feature/P3-fehlerfall` erwartet ein Test in `AirportControllerTest` absichtlich `200` statt `409`.
 
-- Welcher Job wird rot, welche Jobs werden übersprungen?
-- Wo im Log steht der Fehler? (Log-Auszug einfügen)
-- Sind die Testreports trotzdem als Artefakt vorhanden?
+*(Ergebnis folgt nach dem Lauf)*
 
 ## 5. Finale Variante
 
-`ci.yml` kombiniert B und C: Jede Teststufe ist ein eigener Job, und jeder Job läuft per Matrix parallel für beide Services.
+Wir verwenden `ci.yml`. Sie verbindet B und C: jede Teststufe ist ein eigener Job, und jede Stufe läuft parallel für beide Services.
 
-Begründung (Entwurf, mit euren Messwerten prüfen und selbst formulieren):
+- Bei einem Fehler sieht man direkt, welche Stufe und welcher Service betroffen ist.
+- Die schnellen Tests laufen zuerst. Schlagen die Unit Tests fehl, starten Integrations- und Systemtest gar nicht.
+- Durch die Matrix ist sie schneller als B (203 s statt 218 s in Run 2).
+- Der Build-Job liefert pro Service ein JAR, daran hängt P3b den Publish-Schritt an.
 
-- Fehler sind direkt der Stufe und dem Service zugeordnet.
-- Günstige Tests laufen zuerst (Fail Fast): Unit Tests vor Integrationstests vor Systemtest.
-- Services laufen parallel, dadurch kürzere Laufzeit als B.
-- Der Build-Job liefert pro Service ein klar benanntes JAR, an das P3b anknüpft.
-- Nachteil: mehr Runner-Overhead als A, weil jeder Job neu aufsetzt. Der Maven-Cache reduziert das.
+Nachteil: C ist schneller, und die finale Variante braucht am meisten Runner-Zeit, weil jeder Job neu aufsetzt. Für zwei kleine Services nehmen wir das in Kauf, weil uns die klare Fehlerzuordnung wichtiger ist. D haben wir nicht gewählt, weil wir den Systemtest bei jeder Änderung wollen.
 
 ## 6. Effizienz und Stabilität
 
-- **Caching:** `actions/setup-java` mit `cache: maven`, Schlüssel über beide `pom.xml`. ✏️ Laufzeit A (ohne Cache) vs. final (mit Cache) vergleichen.
-- **Parallelisierung:** Matrix über die Services.
-- **Abbruch alter Läufe:** `concurrency` mit `cancel-in-progress` – ein neuer Push bricht den alten Lauf auf demselben Branch ab.
-- **Timeouts:** jeder Job hat `timeout-minutes`, damit ein hängender Test nicht 6 h läuft.
-- **Fixe Runner-Version:** `ubuntu-24.04` statt `ubuntu-latest`, damit sich die Umgebung nicht unbemerkt ändert.
-- **Fehleranalyse:** Testreports werden mit `if: always()` auch bei Fehlern hochgeladen; beim Systemtest werden bei Fehlern die Container-Logs ausgegeben.
-- **Minimale Rechte:** `permissions: contents: read`.
-- **Keine Secrets:** Die CI nutzt eine MongoDB im Container, nicht die Atlas-Datenbank.
+- **Cache:** Maven-Abhängigkeiten werden mit `actions/setup-java` (`cache: maven`) gespeichert. Im finalen Workflow dauerte der Build-Job in Run 1 49 s / 25 s, in Run 2 mit vollem Cache nur noch 14 s / 17 s. Bei B ging der Build-Job von 40 s auf 24 s.
+- **Parallel:** Die Matrix lässt beide Services gleichzeitig laufen.
+- **Alte Läufe abbrechen:** Ein neuer Push auf denselben Branch bricht den laufenden Run ab (`concurrency`).
+- **Timeouts:** Jeder Job hat `timeout-minutes`, ein hängender Test blockiert die Pipeline also nicht.
+- **Feste Runner-Version:** `ubuntu-24.04` statt `ubuntu-latest`.
+- **Fehleranalyse:** Testreports werden auch bei Fehlern hochgeladen. Beim Systemtest werden bei einem Fehler die Container-Logs ausgegeben.
+- **Rechte:** Die Pipeline darf das Repository nur lesen (`permissions: contents: read`).
+- **Keine Secrets:** Die Tests nutzen eine MongoDB im Container, nicht unsere Atlas-Datenbank.
 
-## 7. Vorbereitung P3b
+In Run 2 ist Variante C beim Systemtest abgebrochen, ohne dass ein Test falsch war. Docker Hub hat beim Herunterladen von `mongo:7.0` die Verbindung getrennt:
 
-Der `build`-Job in `ci.yml` erzeugt pro Service das Artefakt `<service>-<commit-sha>` mit dem ausführbaren JAR (`<service>-0.0.1-SNAPSHOT.jar`). In P3b wird ein Job `publish` mit `needs: system-test` ergänzt, der dieses JAR mit einer Version versieht und in ein Artefakt-Repository publiziert. Die Dockerfiles in beiden Services können dort auch für ein Container-Image verwendet werden.
+```text
+Error response from daemon: Head "https://registry-1.docker.io/v2/library/mongo/manifests/7.0": ... connection reset by peer
+```
+
+Solche Fehler kommen von aussen. Man erkennt sie im Log daran, dass der Fehler vor dem ersten Test passiert. Die Lösung ist, den Run neu zu starten („Re-run failed jobs“).
+
+## 7. Vorbereitung für P3b
+
+Der Job `build` in `ci.yml` erstellt pro Service ein JAR und lädt es als Artefakt `<service>-<commit-sha>` hoch. In P3b kommt nach dem Systemtest ein Job dazu, der daraus ein Docker-Image baut und publiziert.
 
 ## 8. KI-Nachweis
 
-### Review 1: veraltete Actions und Runner-Label
+Die Pipelines, die Integrationstests und der Systemtest wurden mit Claude Code erstellt. Wir haben jede Version auf GitHub laufen lassen und die Logs geprüft, bevor wir sie übernommen haben. Secrets oder Zugangsdaten wurden nicht in die KI eingegeben.
 
-**Ausgangslage:** Der erste Lauf von Variante A ([Run 36343278338](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36343278338)) war grün, zeigte aber Warnungen:
+### Review 1: veraltete Actions
+
+**Anfrage:** Claude Code sollte den ersten Lauf von Variante A prüfen ([Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36343278338)). Der Lauf war grün, zeigte aber Warnungen:
 
 ```text
 ! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/upload-artifact@v4.
@@ -160,9 +150,7 @@ Der `build`-Job in `ci.yml` erzeugt pro Service das Artefakt `<service>-<commit-
 - The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026.
 ```
 
-**Prompt:** „Hier sind die Warnungen aus unserem Pipeline-Lauf. Was bedeuten sie und was sollen wir ändern?“
-
-**KI-Hinweis:** Die Actions auf die aktuellen Major-Versionen heben (die Release Notes wurden auf Breaking Changes geprüft) und statt `ubuntu-latest` eine feste Runner-Version verwenden, damit ein Wechsel auf Ubuntu 26 die Pipeline nicht unbemerkt verändert.
+**KI-Hinweis:** Die Actions auf die aktuellen Versionen heben und statt `ubuntu-latest` eine feste Runner-Version verwenden.
 
 **Geänderte Stelle:**
 
@@ -171,29 +159,32 @@ Der `build`-Job in `ci.yml` erzeugt pro Service das Artefakt `<service>-<commit-
 runs-on: ubuntu-latest
 - uses: actions/checkout@v4
 - uses: actions/setup-java@v4
-- uses: actions/upload-artifact@v4
 # nachher
 runs-on: ubuntu-24.04
 - uses: actions/checkout@v7
 - uses: actions/setup-java@v6
-- uses: actions/upload-artifact@v7
 ```
 
-**Validierung ✏️:** Link zum nächsten Lauf und prüfen, ob die Warnungen verschwunden sind.
+**Validierung:** Im nächsten Lauf ([Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484964)) gab es keine Warnungen mehr, alle Jobs waren grün.
 
-**Eigene Schlussfolgerung ✏️:**
+**Schlussfolgerung:** Ein grüner Run heisst nicht, dass alles in Ordnung ist. Die Warnungen hätten die Pipeline später kaputt gemacht. Mit der festen Runner-Version entscheiden wir selbst, wann wir wechseln.
 
-### Review 2: Testcontainers und Docker-Version
+### Review 2: Testcontainers-Version
 
-**KI-Hinweis:** Spring Boot 3.3.5 bringt Testcontainers 1.19.8 mit. Die aktuelle Docker Engine auf den GitHub-Runnern akzeptiert die alte Docker-API-Version dieser Testcontainers-Version nicht mehr; Testcontainers 1.21.4 behebt das („makes version 1.21.x works with recent Docker Engine changes“).
+**KI-Hinweis:** Beim Erstellen der Integrationstests wies Claude Code darauf hin, dass die von Spring Boot 3.3.5 mitgelieferte Testcontainers-Version 1.19.8 nicht zur aktuellen Docker-Version auf den GitHub-Runnern passt. Laut den Release Notes von Testcontainers behebt Version 1.21.4 das.
 
-**Geänderte Stelle:** `pom.xml` beider Services: `<testcontainers.version>1.21.4</testcontainers.version>`
+**Geänderte Stelle:** `pom.xml` beider Services:
 
-**Validierung ✏️:** Log-Auszug des Integrationstest-Jobs einfügen (Zeile mit `Tests run: …` aus Failsafe und der gestartete Container `mongo:7.0`).
+```xml
+<testcontainers.version>1.21.4</testcontainers.version>
+```
 
-**Eigene Schlussfolgerung ✏️:**
+**Validierung:** Im Job „Integrationstests“ startet der Container und die Tests laufen durch ([Run](https://github.com/ellisabeta/M324-Gruppe1/actions/runs/36346484964)):
 
-### Grundsätze
+```text
+INFO tc.mongo:7.0 -- Container mongo:7.0 started in PT1.577904827S
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in ch.tbz.flug.flight.FlightApiIT
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in ch.tbz.flughafen.airport.AirportApiIT
+```
 
-- Alle KI-Vorschläge wurden erst übernommen, nachdem die Pipeline damit auf GitHub gelaufen ist.
-- Es wurden keine Secrets, Tokens oder Connection Strings (Atlas) in KI-Tools eingegeben.
+**Schlussfolgerung:** Die Versionen, die Spring Boot vorgibt, passen nicht immer zur Umgebung in der CI. Version 1.19.8 haben wir nicht selbst ausprobiert, wir haben uns auf die Release Notes verlassen. Mit 1.21.4 laufen die Integrationstests in jedem Run.
