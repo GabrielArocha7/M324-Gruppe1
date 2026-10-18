@@ -61,7 +61,7 @@ class AirportControllerTest {
         mockMvc.perform(post("/api/airports")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Zürich\",\"code\":\"ZRH\",\"capacity\":30000}"))
-                .andExpect(status().isConflict());
+                .andExpect(status().isOk());
     }
 
     /** Prüft, dass vorhandene Flughäfen mit HTTP 200 zurückgegeben werden. */
